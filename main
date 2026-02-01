@@ -100,6 +100,9 @@ local settings = {
 	auto_fg = false,
 	auto_fgrate = 0, -- if you want to make it slower...
 
+	-- Shoot through walls
+	shoot_through_walls = false,
+
 	-- Remove doors (CAUSES 1 SEC OF LAG WHENEVER YOU RESPAWN)
 	nodoors = false,
 
@@ -719,6 +722,50 @@ if hookmetamethod then
 namecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
+    if method == "Raycast" and settings.shoot_through_walls then
+        local args = {...}
+        local params = args[3]
+
+        if typeof(params) == "RaycastParams" then
+            local newParams = RaycastParams.new()
+            newParams.IgnoreWater = params.IgnoreWater
+            newParams.CollisionGroup = params.CollisionGroup
+            newParams.FilterType = Enum.RaycastFilterType.Exclude
+
+            local filter = {}
+            if params.FilterDescendantsInstances then
+                for _, inst in ipairs(params.FilterDescendantsInstances) do
+                    table.insert(filter, inst)
+                end
+            end
+
+            local map = workspace:FindFirstChild("Map")
+            if map then
+                table.insert(filter, map)
+            end
+
+            local buildings = workspace:FindFirstChild("Buildings")
+            if buildings then
+                table.insert(filter, buildings)
+            end
+
+            local doors = workspace:FindFirstChild("Doors")
+            if doors then
+                table.insert(filter, doors)
+            end
+
+            local cellDoors = workspace:FindFirstChild("CellDoors")
+            if cellDoors then
+                table.insert(filter, cellDoors)
+            end
+
+            newParams.FilterDescendantsInstances = filter
+            args[3] = newParams
+        end
+
+        return namecall(self, unpack(args))
+    end
+
     if method == "GetAttributes" then
         local result = namecall(self, ...)
 
@@ -1606,6 +1653,79 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- Random teleport mode
+local TELEPORT_KEY = Enum.KeyCode.O
+local MIN_DISTANCE = 500      -- Minimum teleport distance
+local MAX_DISTANCE = 5000    -- Maximum teleport distance
+local TELEPORT_DELAY = 0.1    -- Time between teleports (seconds)
+
+local isTeleporting = false
+local teleportLoop = nil
+local teleportAccumulator = 0
+
+local teleportCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local teleportHumanoidRootPart = teleportCharacter:WaitForChild("HumanoidRootPart")
+
+local function teleportOnce()
+    local character = teleportCharacter
+    local humanoidRootPart = teleportHumanoidRootPart
+    if not character or not humanoidRootPart then 
+        return 
+    end
+    
+    local currentPosition = humanoidRootPart.Position
+    local randomAngle = math.random() * math.pi * 2
+    local randomDistance = math.random(MIN_DISTANCE, MAX_DISTANCE)
+    
+    local newX = currentPosition.X + math.cos(randomAngle) * randomDistance
+    local newZ = currentPosition.Z + math.sin(randomAngle) * randomDistance
+    local newY = currentPosition.Y + 100
+    
+    humanoidRootPart.CFrame = CFrame.new(newX, newY, newZ)
+end
+
+local function toggleTeleportMode()
+    isTeleporting = not isTeleporting
+    
+    if isTeleporting then
+        print("Starting continuous teleport...")
+        print("Distance range: " .. MIN_DISTANCE .. " to " .. MAX_DISTANCE .. " studs")
+        print("Teleport delay: " .. TELEPORT_DELAY .. " seconds")
+        teleportAccumulator = 0
+        
+        teleportLoop = RunService.Heartbeat:Connect(function(dt)
+            teleportAccumulator = teleportAccumulator + dt
+            if teleportAccumulator >= TELEPORT_DELAY then
+                teleportAccumulator = 0
+                teleportOnce()
+            end
+        end)
+        
+    else
+        print("Stopping teleport...")
+        
+        if teleportLoop then
+            teleportLoop:Disconnect()
+            teleportLoop = nil
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, isGameProcessed)
+    if isGameProcessed then 
+        return 
+    end
+    
+    if input.KeyCode == TELEPORT_KEY then
+        toggleTeleportMode()
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    teleportCharacter = newCharacter
+    teleportHumanoidRootPart = newCharacter:WaitForChild("HumanoidRootPart")
+end)
+
 local Doors = workspace:FindFirstChild("Doors")
 local CellDoors = workspace:FindFirstChild("CellDoors")
 
@@ -2148,6 +2268,16 @@ local function handleCommand(msg)
 		Notify("Your guns will no longer have fast fire-rate.")
     end
 
+	if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."sthwalls" then
+        settings.shoot_through_walls = true
+		Notify("Enabled shooting through walls.")
+    end
+
+	if string.sub(lowerMsg, 1, #prefix + 10) == prefix.."unstwalls" then
+        settings.shoot_through_walls = false
+		Notify("Disabled shooting through walls.")
+    end
+
 	if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."firerate" then
 		local parts = lowerMsg:split(" ")
 		settings.auto_fgrate = tonumber(parts[2])
@@ -2492,6 +2622,15 @@ CombatTab:CreateSlider({
     Flag = "FireRateSlider",
     Callback = function(Value)
         settings.auto_fgrate = Value
+    end,
+})
+
+CombatTab:CreateToggle({
+    Name = "Shoot Through Walls",
+    CurrentValue = settings.shoot_through_walls,
+    Flag = "ShootThroughWallsToggle",
+    Callback = function(Value)
+        settings.shoot_through_walls = Value
     end,
 })
 
