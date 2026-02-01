@@ -281,6 +281,7 @@ local function createTab(tabName)
     function tabApi:CreateToggle(options)
         local group = currentGroup()
         group:AddToggle(options.Name, {
+            Text = options.Name,
             Default = options.CurrentValue,
             Callback = options.Callback,
         })
@@ -288,12 +289,16 @@ local function createTab(tabName)
 
     function tabApi:CreateButton(options)
         local group = currentGroup()
-        group:AddButton(options.Name, options.Callback)
+        group:AddButton({
+            Text = options.Name,
+            Func = options.Callback,
+        })
     end
 
     function tabApi:CreateSlider(options)
         local group = currentGroup()
         group:AddSlider(options.Name, {
+            Text = options.Name,
             Default = options.CurrentValue,
             Min = options.Range[1],
             Max = options.Range[2],
@@ -306,6 +311,7 @@ local function createTab(tabName)
     function tabApi:CreateDropdown(options)
         local group = currentGroup()
         local dropdown = group:AddDropdown(options.Name, {
+            Text = options.Name,
             Values = options.Options or {},
             Default = options.CurrentValue,
             Multi = false,
@@ -326,6 +332,7 @@ local function createTab(tabName)
     function tabApi:CreateKeybind(options)
         local group = currentGroup()
         group:AddKeybind(options.Name, {
+            Text = options.Name,
             Default = options.CurrentValue or "RightShift",
             Mode = options.Mode or "Toggle",
             Callback = options.Callback,
