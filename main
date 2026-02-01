@@ -158,6 +158,10 @@ local settings = {
 
 	-- Temp Noclip ONLY when jumping with the Snack item equipped
 	ncglitch = false,
+
+	-- Aimlock keybind
+	aimlock_key = Enum.KeyCode.RightShift,
+	
 	
 	-- Aimlock toggle key
 	aimlock_key = Enum.KeyCode.RightShift,
@@ -168,6 +172,18 @@ local settings = {
 
 getgenv().espsettings = false -- ESP toggle
 getgenv().aimlock = false -- Aimlock toggle
+
+local function toKeyCode(value)
+	if typeof(value) == "EnumItem" and value.EnumType == Enum.KeyCode then
+		return value
+	end
+
+	if typeof(value) == "string" and Enum.KeyCode[value] then
+		return Enum.KeyCode[value]
+	end
+
+	return settings.aimlock_key
+end
 
 -- arrest aura wl
 aa_wl = {"ScriptingProgrammer", "kohlslitedev"}
@@ -187,6 +203,114 @@ local function Notify(text, time)
     end)
 end
 
+local version = "v1.24"
+
+-- GUI Setup
+local Linoria = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
+
+local Window = Linoria:CreateWindow({
+    Title = "PrisonX v1.24",
+    Center = true,
+    AutoShow = true,
+})
+
+ThemeManager:SetLibrary(Linoria)
+SaveManager:SetLibrary(Linoria)
+
+local function createTab(tabName)
+    local tab = Window:AddTab(tabName)
+    local groups = {}
+
+    local tabApi = {}
+    function tabApi:CreateSection(sectionName)
+        local group = tab:AddLeftGroupbox(sectionName)
+        table.insert(groups, group)
+        tabApi._currentGroup = group
+        return group
+    end
+
+    local function currentGroup()
+        return tabApi._currentGroup or tab:AddLeftGroupbox("General")
+    end
+
+    function tabApi:CreateToggle(options)
+        local group = currentGroup()
+        group:AddToggle(options.Name, {
+            Default = options.CurrentValue,
+            Callback = options.Callback,
+        })
+    end
+
+    function tabApi:CreateButton(options)
+        local group = currentGroup()
+        group:AddButton(options.Name, options.Callback)
+    end
+
+    function tabApi:CreateSlider(options)
+        local group = currentGroup()
+        group:AddSlider(options.Name, {
+            Default = options.CurrentValue,
+            Min = options.Range[1],
+            Max = options.Range[2],
+            Rounding = options.Increment or 1,
+            Suffix = options.Suffix or "",
+            Callback = options.Callback,
+        })
+    end
+
+    function tabApi:CreateDropdown(options)
+        local group = currentGroup()
+        local dropdown = group:AddDropdown(options.Name, {
+            Values = options.Options or {},
+            Default = options.CurrentValue,
+            Multi = false,
+            Callback = function(value)
+                if options.Callback then
+                    options.Callback({value})
+                end
+            end,
+        })
+
+        local wrapper = {}
+        function wrapper:Refresh(newOptions)
+            dropdown:SetValues(newOptions or {})
+        end
+        return wrapper
+    end
+
+    function tabApi:CreateKeybind(options)
+        local group = currentGroup()
+        group:AddKeybind(options.Name, {
+            Default = options.CurrentValue or "RightShift",
+            Mode = options.Mode or "Toggle",
+            Callback = options.Callback,
+        })
+    end
+
+    return tabApi
+end
+
+local Rayfield = {
+    CreateWindow = function()
+        return {
+            CreateTab = createTab,
+        }
+    end,
+    LoadConfiguration = function() end,
+}
+
+local MainTab = createTab("Main Features")
+local CombatTab = createTab("Combat")
+local TeleportTab = createTab("Teleport")
+local AutoTab = createTab("Automation")
+local ProtectTab = createTab("Protection")
+local PlayerTab = createTab("Player")
+local ESPTab = createTab("ESP")
+local AimbotTab = createTab("Aimlock")
+local LCTab = createTab("Lists + Checks")
+local OtherTab = createTab("Other")
 local function findKeyCode(keyName)
     if typeof(keyName) == "EnumItem" then
         return keyName
@@ -830,6 +954,7 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
         local args = {...}
         local params = args[3]
 
+        if typeof(params) == "RaycastParams" and params.FilterType == Enum.RaycastFilterType.Exclude then
         if typeof(params) ~= "RaycastParams" or not isWeaponRaycast() then
             return namecall(self, unpack(args))
         end
@@ -847,6 +972,24 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
                 end
             end
 
+            local map = workspace:FindFirstChild("Map")
+            if map then
+                table.insert(filter, map)
+            end
+
+            local buildings = workspace:FindFirstChild("Buildings")
+            if buildings then
+                table.insert(filter, buildings)
+            end
+
+            local doors = workspace:FindFirstChild("Doors")
+            if doors then
+                table.insert(filter, doors)
+            end
+
+            local cellDoors = workspace:FindFirstChild("CellDoors")
+            if cellDoors then
+                table.insert(filter, cellDoors)
             if params.FilterType == Enum.RaycastFilterType.Exclude then
                 appendFilter(filter, workspace:FindFirstChild("Map"))
                 appendFilter(filter, workspace:FindFirstChild("Buildings"))
@@ -2489,6 +2632,7 @@ local function handleCommand(msg)
 		getgenv().esp = false
 	end
 	
+	if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
     if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
     	settings.enablere = true
 		Notify("The reset button will no longer get disabled when you get tased!")
@@ -3177,6 +3321,11 @@ AimbotTab:CreateToggle({
 
 AimbotTab:CreateSection("Keybind")
 AimbotTab:CreateKeybind({
+    Name = "Aimlock Toggle Key",
+    CurrentValue = settings.aimlock_key.Name,
+    Callback = function(Value)
+        settings.aimlock_key = toKeyCode(Value)
+        Notify("Aimlock key set to " .. settings.aimlock_key.Name)
     Name = "Aimlock Key",
     CurrentKeybind = settings.aimlock_key.Name,
     HoldToInteract = false,
