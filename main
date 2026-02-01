@@ -206,6 +206,26 @@ end
 local version = "v1.24"
 
 -- GUI Setup
+local Linoria = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))
+if not Linoria then
+	warn("Failed to load Linoria library.")
+	return
+end
+Linoria = Linoria()
+
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))
+if not ThemeManager then
+	warn("Failed to load Linoria ThemeManager.")
+	return
+end
+ThemeManager = ThemeManager()
+
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))
+if not SaveManager then
+	warn("Failed to load Linoria SaveManager.")
+	return
+end
+SaveManager = SaveManager()
 local Linoria = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
 local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
