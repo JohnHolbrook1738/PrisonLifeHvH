@@ -721,6 +721,75 @@ end
 -- Hook __namecall
 local namecall
 if hookmetamethod then
+local weaponRaycastKeywords = {
+    "gun",
+    "weapon",
+    "rifle",
+    "shotgun",
+    "smg",
+    "pistol",
+    "fire",
+    "bullet",
+    "projectile",
+    "ak",
+    "m4",
+    "m9",
+    "fal",
+    "m700",
+    "mp5",
+    "remington",
+    "taser",
+    "revolver"
+}
+
+local function isWeaponRaycast()
+    for level = 2, 8 do
+        local info = debug.getinfo(level, "sln")
+        if not info then
+            break
+        end
+
+        local source = (info.source or ""):lower()
+        local short = (info.short_src or ""):lower()
+        local name = (info.name or ""):lower()
+        local combined = source .. " " .. short .. " " .. name
+
+        for _, keyword in ipairs(weaponRaycastKeywords) do
+            if string.find(combined, keyword, 1, true) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function isCriticalRaycastTarget(inst)
+    if not inst then
+        return false
+    end
+
+    if inst == game.Players then
+        return true
+    end
+
+    if inst:IsA("Model") and inst:FindFirstChildOfClass("Humanoid") then
+        return true
+    end
+
+    if inst:IsDescendantOf(game.Players) then
+        return true
+    end
+
+    return false
+end
+
+local function appendFilter(filter, inst)
+    if inst and not isCriticalRaycastTarget(inst) then
+        table.insert(filter, inst)
+    end
+end
+
 namecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
@@ -728,11 +797,15 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
         local args = {...}
         local params = args[3]
 
+        if typeof(params) ~= "RaycastParams" or not isWeaponRaycast() then
+            return namecall(self, unpack(args))
+        end
+
         if typeof(params) == "RaycastParams" then
             local newParams = RaycastParams.new()
             newParams.IgnoreWater = params.IgnoreWater
             newParams.CollisionGroup = params.CollisionGroup
-            newParams.FilterType = Enum.RaycastFilterType.Exclude
+            newParams.FilterType = params.FilterType
 
             local filter = {}
             if params.FilterDescendantsInstances then
@@ -741,24 +814,11 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
                 end
             end
 
-            local map = workspace:FindFirstChild("Map")
-            if map then
-                table.insert(filter, map)
-            end
-
-            local buildings = workspace:FindFirstChild("Buildings")
-            if buildings then
-                table.insert(filter, buildings)
-            end
-
-            local doors = workspace:FindFirstChild("Doors")
-            if doors then
-                table.insert(filter, doors)
-            end
-
-            local cellDoors = workspace:FindFirstChild("CellDoors")
-            if cellDoors then
-                table.insert(filter, cellDoors)
+            if params.FilterType == Enum.RaycastFilterType.Exclude then
+                appendFilter(filter, workspace:FindFirstChild("Map"))
+                appendFilter(filter, workspace:FindFirstChild("Buildings"))
+                appendFilter(filter, workspace:FindFirstChild("Doors"))
+                appendFilter(filter, workspace:FindFirstChild("CellDoors"))
             end
 
             newParams.FilterDescendantsInstances = filter
