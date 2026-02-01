@@ -159,6 +159,9 @@ local settings = {
 	-- Temp Noclip ONLY when jumping with the Snack item equipped
 	ncglitch = false,
 	
+	-- Aimlock toggle key
+	aimlock_key = Enum.KeyCode.RightShift,
+
 	-- Keep PrisonX after serverhop/rejoin
 	KeepPX = true
 }
@@ -182,6 +185,36 @@ local function Notify(text, time)
             Duration = time or 2;
         })
     end)
+end
+
+local function findKeyCode(keyName)
+    if typeof(keyName) == "EnumItem" then
+        return keyName
+    end
+
+    if typeof(keyName) ~= "string" then
+        return nil
+    end
+
+    local normalized = keyName:gsub("%s+", ""):lower()
+    for _, key in ipairs(Enum.KeyCode:GetEnumItems()) do
+        if key.Name:lower() == normalized then
+            return key
+        end
+    end
+
+    return nil
+end
+
+local function setAimlockKey(keyName)
+    local keyCode = findKeyCode(keyName)
+    if not keyCode then
+        Notify("Invalid aimlock key: " .. tostring(keyName))
+        return
+    end
+
+    settings.aimlock_key = keyCode
+    Notify("Aimlock key set to " .. keyCode.Name .. ".")
 end
 
 local version = "v1.24"
@@ -1647,7 +1680,7 @@ UIS.InputBegan:Connect(function(input, gp)
             teleportTo("criminal_base")
         end
 
-    elseif input.KeyCode == Enum.KeyCode.RightShift then
+    elseif input.KeyCode == settings.aimlock_key then
         getgenv().aimlock.Aimbot = not getgenv().aimlock.Aimbot
 
     elseif input.KeyCode == Enum.KeyCode.RightControl then
@@ -2396,7 +2429,7 @@ local function handleCommand(msg)
 		getgenv().esp = false
 	end
 	
-	if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
+    if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
     	settings.enablere = true
 		Notify("The reset button will no longer get disabled when you get tased!")
 	end
@@ -2404,6 +2437,17 @@ local function handleCommand(msg)
 	if string.sub(lowerMsg, 1, #prefix + 9) == prefix.."disablere" then
     	settings.enablere = false
 		Notify("Disabled!")
+	end
+
+	if string.sub(lowerMsg, 1, #prefix + 6) == prefix.."aimkey" then
+        local parts = msg:split(" ")
+        local keyName = parts[2]
+        if not keyName then
+            Notify("Enter a key name for aimlock.")
+            return
+        end
+
+        setAimlockKey(keyName)
 	end
 	
 end
@@ -3068,6 +3112,17 @@ AimbotTab:CreateToggle({
     Flag = "AimlockToggle",
     Callback = function(Value)
 		getgenv().aimlock.Aimbot = Value
+    end,
+})
+
+AimbotTab:CreateSection("Keybind")
+AimbotTab:CreateKeybind({
+    Name = "Aimlock Key",
+    CurrentKeybind = settings.aimlock_key.Name,
+    HoldToInteract = false,
+    Flag = "AimlockKeybind",
+    Callback = function(Keybind)
+        setAimlockKey(Keybind)
     end,
 })
 
