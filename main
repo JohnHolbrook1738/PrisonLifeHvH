@@ -162,6 +162,10 @@ local settings = {
 	-- Aimlock keybind
 	aimlock_key = Enum.KeyCode.RightShift,
 	
+	
+	-- Aimlock toggle key
+	aimlock_key = Enum.KeyCode.RightShift,
+
 	-- Keep PrisonX after serverhop/rejoin
 	KeepPX = true
 }
@@ -222,6 +226,9 @@ if not SaveManager then
 	return
 end
 SaveManager = SaveManager()
+local Linoria = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua"))()
 
 local Window = Linoria:CreateWindow({
     Title = "PrisonX v1.24",
@@ -324,6 +331,66 @@ local ESPTab = createTab("ESP")
 local AimbotTab = createTab("Aimlock")
 local LCTab = createTab("Lists + Checks")
 local OtherTab = createTab("Other")
+local function findKeyCode(keyName)
+    if typeof(keyName) == "EnumItem" then
+        return keyName
+    end
+
+    if typeof(keyName) ~= "string" then
+        return nil
+    end
+
+    local normalized = keyName:gsub("%s+", ""):lower()
+    for _, key in ipairs(Enum.KeyCode:GetEnumItems()) do
+        if key.Name:lower() == normalized then
+            return key
+        end
+    end
+
+    return nil
+end
+
+local function setAimlockKey(keyName)
+    local keyCode = findKeyCode(keyName)
+    if not keyCode then
+        Notify("Invalid aimlock key: " .. tostring(keyName))
+        return
+    end
+
+    settings.aimlock_key = keyCode
+    Notify("Aimlock key set to " .. keyCode.Name .. ".")
+end
+
+local version = "v1.24"
+
+-- GUI Setup
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "PrisonX",
+    Icon = nil,
+    LoadingTitle = "PrisonX v1.24",
+    LoadingSubtitle = "Created by TS2021",
+    ConfigurationSaving = {
+        Enabled = false,
+    },
+    Discord = {
+        Enabled = false,
+    },
+    KeySystem = false,
+})
+
+-- Tabs
+local MainTab = Window:CreateTab("Main Features", nil)
+local CombatTab = Window:CreateTab("Combat", nil)
+local TeleportTab = Window:CreateTab("Teleport", nil)
+local AutoTab = Window:CreateTab("Automation", nil)
+local ProtectTab = Window:CreateTab("Protection", nil)
+local PlayerTab = Window:CreateTab("Player", nil)
+local ESPTab = Window:CreateTab("ESP", nil)
+local AimbotTab = Window:CreateTab("Aimlock", nil)
+local LCTab = Window:CreateTab("Lists + Checks", nil)
+local OtherTab = Window:CreateTab("Other", nil)
 
 -- Variables
 local Players = game:GetService("Players")
@@ -831,6 +898,75 @@ end
 -- Hook __namecall
 local namecall
 if hookmetamethod then
+local weaponRaycastKeywords = {
+    "gun",
+    "weapon",
+    "rifle",
+    "shotgun",
+    "smg",
+    "pistol",
+    "fire",
+    "bullet",
+    "projectile",
+    "ak",
+    "m4",
+    "m9",
+    "fal",
+    "m700",
+    "mp5",
+    "remington",
+    "taser",
+    "revolver"
+}
+
+local function isWeaponRaycast()
+    for level = 2, 8 do
+        local info = debug.getinfo(level, "sln")
+        if not info then
+            break
+        end
+
+        local source = (info.source or ""):lower()
+        local short = (info.short_src or ""):lower()
+        local name = (info.name or ""):lower()
+        local combined = source .. " " .. short .. " " .. name
+
+        for _, keyword in ipairs(weaponRaycastKeywords) do
+            if string.find(combined, keyword, 1, true) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function isCriticalRaycastTarget(inst)
+    if not inst then
+        return false
+    end
+
+    if inst == game.Players then
+        return true
+    end
+
+    if inst:IsA("Model") and inst:FindFirstChildOfClass("Humanoid") then
+        return true
+    end
+
+    if inst:IsDescendantOf(game.Players) then
+        return true
+    end
+
+    return false
+end
+
+local function appendFilter(filter, inst)
+    if inst and not isCriticalRaycastTarget(inst) then
+        table.insert(filter, inst)
+    end
+end
+
 namecall = hookmetamethod(game, "__namecall", function(self, ...)
     local method = getnamecallmethod()
     
@@ -839,6 +975,11 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
         local params = args[3]
 
         if typeof(params) == "RaycastParams" and params.FilterType == Enum.RaycastFilterType.Exclude then
+        if typeof(params) ~= "RaycastParams" or not isWeaponRaycast() then
+            return namecall(self, unpack(args))
+        end
+
+        if typeof(params) == "RaycastParams" then
             local newParams = RaycastParams.new()
             newParams.IgnoreWater = params.IgnoreWater
             newParams.CollisionGroup = params.CollisionGroup
@@ -869,6 +1010,11 @@ namecall = hookmetamethod(game, "__namecall", function(self, ...)
             local cellDoors = workspace:FindFirstChild("CellDoors")
             if cellDoors then
                 table.insert(filter, cellDoors)
+            if params.FilterType == Enum.RaycastFilterType.Exclude then
+                appendFilter(filter, workspace:FindFirstChild("Map"))
+                appendFilter(filter, workspace:FindFirstChild("Buildings"))
+                appendFilter(filter, workspace:FindFirstChild("Doors"))
+                appendFilter(filter, workspace:FindFirstChild("CellDoors"))
             end
 
             newParams.FilterDescendantsInstances = filter
@@ -2507,6 +2653,7 @@ local function handleCommand(msg)
 	end
 	
 	if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
+    if string.sub(lowerMsg, 1, #prefix + 8) == prefix.."enablere" then
     	settings.enablere = true
 		Notify("The reset button will no longer get disabled when you get tased!")
 	end
@@ -2514,6 +2661,17 @@ local function handleCommand(msg)
 	if string.sub(lowerMsg, 1, #prefix + 9) == prefix.."disablere" then
     	settings.enablere = false
 		Notify("Disabled!")
+	end
+
+	if string.sub(lowerMsg, 1, #prefix + 6) == prefix.."aimkey" then
+        local parts = msg:split(" ")
+        local keyName = parts[2]
+        if not keyName then
+            Notify("Enter a key name for aimlock.")
+            return
+        end
+
+        setAimlockKey(keyName)
 	end
 	
 end
@@ -3188,6 +3346,12 @@ AimbotTab:CreateKeybind({
     Callback = function(Value)
         settings.aimlock_key = toKeyCode(Value)
         Notify("Aimlock key set to " .. settings.aimlock_key.Name)
+    Name = "Aimlock Key",
+    CurrentKeybind = settings.aimlock_key.Name,
+    HoldToInteract = false,
+    Flag = "AimlockKeybind",
+    Callback = function(Keybind)
+        setAimlockKey(Keybind)
     end,
 })
 
